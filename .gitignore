@@ -1,0 +1,14 @@
+.vs
+.vscode
+CodeAnalysis
+out
+bin
+Makefile
+build
+
+CMakeFiles
+CMakeCache.txt
+CMakeSettings.json
+cmake_install.cmake
+
+doc/html

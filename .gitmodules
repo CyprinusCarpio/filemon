@@ -1,0 +1,3 @@
+[submodule "external/fleet"]
+	path = external/fleet
+	url = https://github.com/cyprinuscarpio/fleet.git
