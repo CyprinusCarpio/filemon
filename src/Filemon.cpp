@@ -9,6 +9,8 @@
 #include <fcntl.h>
 #include <unistd.h>
 
+#include "xdgmime.h"
+
 enum MenuIDS
 {
     MENU_FILE_NEW_FILE,
@@ -124,9 +126,16 @@ void Filemon::listview_cb(Fl_Widget* w, void* data)
 
     Fle_Listview_Reason reason = (Fle_Listview_Reason)Fl::callback_reason();
     ListviewFile* file = (ListviewFile*)filemon->m_listview->get_callback_item();
-    if(reason == FLE_LISTVIEW_REASON_RESELECTED && file->is_folder() && Fl::event_clicks())
+    if(reason == FLE_LISTVIEW_REASON_RESELECTED && Fl::event_clicks())
     {
-        filemon->navigate_to_dir(file->get_path());
+        if(file->is_folder())
+        {
+            filemon->navigate_to_dir(file->get_path());
+        }
+        else
+        {
+            filemon->open_file(file->get_path());
+        }
     }
     if(reason == FLE_LISTVIEW_REASON_DESELECTED || reason == FLE_LISTVIEW_REASON_SELECTED || reason == FLE_LISTVIEW_REASON_RESELECTED)
     {
@@ -449,6 +458,28 @@ bool Filemon::navigate_to_dir(const std::filesystem::path& path)
     return true;
 }
 
+bool Filemon::open_file(const std::filesystem::path &path)
+{
+    struct stat st;
+    if (stat(path.string().c_str(), &st) == 0 && (st.st_mode & S_IXUSR))
+    {
+        std::string command = "nohup \"" + path.string() + "\" &";
+        if (popen(command.c_str(), "r") == nullptr)
+        {
+            return false;
+        }
+    }
+    else
+    {
+        std::string command = "xdg-open \"" + path.string() + "\"";
+        if (system(command.c_str()) == -1)
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
 int Filemon::run()
 {
     m_inotifyFd = inotify_init();
@@ -466,8 +497,8 @@ int Filemon::run()
     while(true)
     {
         i = 0;
-        int r = Fl::check();
-        if(r == 0 || !visible())
+        int r = Fl::wait();
+        if(r == 0)
         {
             break;
         }
@@ -496,5 +527,8 @@ int Filemon::run()
     }
 
     close(m_inotifyFd);
+
+    xdg_mime_shutdown();
+
     return 0;
 }

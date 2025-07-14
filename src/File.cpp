@@ -14,6 +14,8 @@
 #include <pwd.h>
 #include <iomanip>
 
+#include "xdgmime.h"
+
 bool ListviewFile::is_greater(Fle_Listview_Item* other, int property)
 {
     ListviewFile* o = (ListviewFile*)other;
@@ -117,18 +119,20 @@ ListviewFile::ListviewFile(std::string name, long size, std::filesystem::path pa
     static Fl_Pixmap* bin16 = new Fl_Pixmap(bin16_xpm);
 
     stat(m_path.c_str(), &m_stat);
-
-    std::string ext = path.extension();
     if(m_size == -1)
     {
         set_icon(folder16, folder32);
+        return;
     }
-    else if(ext == ".png" || ext == ".jpg" || ext == ".jpeg")
-    {
-        set_icon(img16, img32);
-    }
-    else if(ext == ".bin" || ext == ".exe" || ext == ".dll" || ext == ".so" || ext == ".o" || ext == ".a" || ext == ".elf")
+    
+    std::string mime = xdg_mime_get_mime_type_for_file(m_path.c_str(), &m_stat);
+
+    if (mime == "application/x-executable" || mime == "application/x-sharedlib" || mime == "application/x-pie-executable" || mime == "application/x-shared-object")
     {
         set_icon(bin16, bin32);
+    }
+    else if(mime.substr(0, 5) == "image")
+    {
+        set_icon(img16, img32);
     }
 }

@@ -1,3 +1,6 @@
 [submodule "external/fleet"]
 	path = external/fleet
 	url = https://github.com/cyprinuscarpio/fleet.git
+[submodule "external/xdgmime"]
+	path = external/xdgmime
+	url = https://gitlab.freedesktop.org/xdg/xdgmime.git

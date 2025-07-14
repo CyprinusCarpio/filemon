@@ -57,6 +57,7 @@ class Filemon : public Fl_Double_Window
     void tree_update_branch(inotify_event* event);
 
     bool navigate_to_dir(const std::filesystem::path& path);
+    bool open_file(const std::filesystem::path& path);
 public:
     Filemon(int W, int H, const char* l);
 
