@@ -2,6 +2,9 @@
 #include "File.hpp"
 #include "Util.hpp"
 #include "../icons/folder16.xpm"
+#include "../icons/filemon.xpm"
+
+#include <FL/Fl_Text_Display.H>
 
 #include <iostream>
 #include <sys/types.h>
@@ -9,7 +12,9 @@
 #include <fcntl.h>
 #include <unistd.h>
 
-#include "xdgmime.h"
+#ifdef FLTK_USE_WAYLAND
+#include <FL/platform.H>
+#endif
 
 enum MenuIDS
 {
@@ -54,6 +59,16 @@ enum DockIDS
     DOCK_STATUS,
 };
 
+void about_wnd_close_callback(Fl_Widget* w, void* d)
+{
+    w->window()->hide();
+}
+
+void about_wnd_github_callback(Fl_Widget* w, void* d)
+{
+    g_app_info_launch_default_for_uri("https://github.com/CyprinusCarpio/filemon", nullptr, nullptr);
+}
+
 class FlatMenuBar : public Fl_Menu_Bar
 {
 public:
@@ -70,8 +85,6 @@ protected:
 
 Filemon::Filemon(int W, int H, const char* l): Fl_Double_Window(W, H, l)
 {
-    m_inotifyFd = -1;
-
     m_dockHost = new Fle_Dock_Host(0, 0, W, H, l, FLE_DOCK_ALLDIRS);
     resizable(m_dockHost);
     end();
@@ -118,6 +131,27 @@ Filemon::Filemon(int W, int H, const char* l): Fl_Double_Window(W, H, l)
     m_statusGroup->add_band_widget(m_status, 2, 4, 2, 4);
 
     tree_populate_dir(m_tree->root(), "/");
+
+    m_terminalEmulator = "xterm";
+
+    m_filemonLogo = new Fl_Pixmap(filemon_xpm);
+    m_aboutWindow = new Fl_Double_Window(512, 256, "About Filemon");
+    //m_aboutWindow->set_modal();
+    Fl_Box* logo = new Fl_Box(0, 0, 256, 256);
+    logo->image(m_filemonLogo);
+    Fl_Text_Display* text = new Fl_Text_Display(256, 0, 256, 215);
+    Fl_Text_Buffer* buffer = new Fl_Text_Buffer();
+    buffer->text(
+        "Filemon 0.1.0\n"
+        "A lightweight X11/Wayland file browser for Linux based on the FLTK toolkit."
+    );
+    text->buffer(buffer);
+    text->wrap_mode(2, 0);
+
+    Fl_Button* githubButton = new Fl_Button(350, 222, 70, 26, "GitHub");
+    githubButton->callback(about_wnd_github_callback);
+    Fl_Button* closeButton = new Fl_Button(430, 222, 70, 26, "Close");
+    closeButton->callback(about_wnd_close_callback);
 }
 
 void Filemon::listview_cb(Fl_Widget* w, void* data)
@@ -199,9 +233,32 @@ void Filemon::menu_cb(Fl_Widget* w, void* data)
 
     switch(item)
     {
+        case MENU_FILE_OPEN_TERMINAL:
+            filemon->open_terminal();
+            break;
         case MENU_FILE_QUIT:
             exit(0);
             break;
+        case MENU_EDIT_CUT:
+            filemon->copy_selected_files(true);
+            break;
+        case MENU_EDIT_COPY:
+            filemon->copy_selected_files(false);
+            break;
+        case MENU_EDIT_PASTE:
+            filemon->paste_files();
+            break;
+        case MENU_EDIT_TRASH:
+        {
+            std::vector<int> selected = listview->get_selected();
+            for(int i = 0; i < selected.size(); i++)
+            {
+                ListviewFile* file = (ListviewFile*)listview->get_item(selected[i]);
+                filemon->trash_file(file->get_path());
+            }
+            filemon->navigate_to_dir(filemon->m_currentPath);
+            break;
+        }
         case MENU_VIEW:
             ((Fl_Menu_Item*)menu->find_item("View/Show treeview"))->value(!filemon->m_treeDockGroup->hidden());
             break;
@@ -225,6 +282,9 @@ void Filemon::menu_cb(Fl_Widget* w, void* data)
             break;
         case MENU_VIEW_DETAILS_HIGHLIGHT_BOX:
             listview->set_details_mode(FLE_LISTVIEW_DETAILS_HIGHLIGHT);
+            break;
+        case MENU_HELP_ABOUT:
+            filemon->m_aboutWindow->show();
             break;
     }
 }
@@ -259,6 +319,74 @@ void Filemon::tool_cb(Fl_Widget* w, void* data)
             }
             break;
     }
+}
+
+void Filemon::dir_watch_cb(GFileMonitor *monitor, GFile *file, GFile *other_file, GFileMonitorEvent event_type, gpointer user_data)
+{
+    Filemon* filemon = (Filemon*)user_data;
+
+    GFile* dir = g_file_get_parent(file);
+
+    // If the file is in the current directory, update the listview
+    if(strcmp(g_file_get_path(dir), filemon->m_currentPath.c_str()) == 0)
+    {
+        if(event_type == G_FILE_MONITOR_EVENT_DELETED)
+        {
+            for(int i = 0; i < filemon->m_listview->get_item_count(); i++)
+            {
+                ListviewFile* listviewFile = (ListviewFile*)filemon->m_listview->get_item(i);
+                if(listviewFile->get_path() == g_file_get_path(file))
+                {
+                    filemon->m_listview->remove_item(i);
+                    filemon->m_filesInDir--;
+                    break;
+                }
+            }
+        }
+        else if(event_type == G_FILE_MONITOR_EVENT_CREATED)
+        {
+            int size = std::filesystem::is_directory(g_file_get_path(file)) ? -1 : std::filesystem::file_size(g_file_get_path(file));
+            ListviewFile* item = new ListviewFile(g_file_get_basename(file), size, g_file_get_path(file));
+            filemon->m_listview->add_item(item);
+            filemon->m_filesInDir++;
+        }
+        else if(event_type == G_FILE_MONITOR_EVENT_CHANGED)
+        {
+            for(int i = 0; i < filemon->m_listview->get_item_count(); i++)
+            {
+                ListviewFile* listviewFile = (ListviewFile*)filemon->m_listview->get_item(i);
+                if(listviewFile->get_path() == g_file_get_path(file))
+                {
+                    listviewFile->size(std::filesystem::is_directory(g_file_get_path(file)) ? -1 : std::filesystem::file_size(g_file_get_path(file)));
+                    break;
+                }
+            }
+        }
+    }
+
+    // Update the treeview
+    Fl_Tree_Item* treeItem = filemon->m_tree->find_item(g_file_get_path(dir));
+    if(treeItem && event_type == G_FILE_MONITOR_EVENT_DELETED)
+    {
+        treeItem->remove_child(g_file_get_basename(file));
+    }
+    if(treeItem && g_file_query_file_type(file, G_FILE_QUERY_INFO_NONE, nullptr) == G_FILE_TYPE_DIRECTORY && event_type == G_FILE_MONITOR_EVENT_CREATED)
+    {
+        std::filesystem::path newItem = g_file_get_path(file);
+        Fl_Tree_Item* itemAdded = filemon->m_tree->add(treeItem, newItem.filename().string().c_str());
+        for(auto const& entry : std::filesystem::directory_iterator(newItem))
+        {
+            if(entry.is_directory())
+            {
+                itemAdded->add(filemon->m_tree->prefs(), "");
+                itemAdded->close();
+                break;
+            }
+        }
+        itemAdded->close();
+    }
+
+    filemon->redraw();
 }
 
 void Filemon::construct_menu(Fl_Menu_Bar* menu)
@@ -324,14 +452,13 @@ void Filemon::tree_populate_dir(Fl_Tree_Item* directory, std::filesystem::path p
     directory->remove_child("");
     directory->user_data((void*)1);;
 
-    int watch = inotify_add_watch(m_inotifyFd, path.c_str(), IN_CREATE | IN_DELETE | IN_MOVE);
-    m_watchMap[watch] = path;
+    monitor_directory(path);
 
     for(auto const& entry : std::filesystem::directory_iterator(path))
     {
         if(entry.is_directory())
         {
-            if(directory->find_child(entry.path().filename().string().c_str()) != -1)
+            if(directory->find_child(entry.path().filename().c_str()) != -1)
             {
                 continue;
             }
@@ -356,37 +483,15 @@ void Filemon::tree_populate_dir(Fl_Tree_Item* directory, std::filesystem::path p
     }
 }
 
-void Filemon::tree_update_branch(inotify_event* event)
+void Filemon::monitor_directory(const std::filesystem::path &path)
 {
-    Fl_Tree_Item* treeItem = m_tree->find_item(m_watchMap[event->wd].string().c_str());
-    if(treeItem == nullptr)
-    {
-        return;
-    }
-    if(event->mask & IN_CREATE || event->mask & IN_MOVED_TO)
-    {
-        std::filesystem::path newItem = m_watchMap[event->wd] / event->name;
-        if(std::filesystem::is_directory(newItem))
-        {
-            Fl_Tree_Item* itemAdded = m_tree->add(treeItem, event->name);
-            for(auto const& entry2 : std::filesystem::directory_iterator(newItem))
-            {
-                if(entry2.is_directory())
-                {
-                    itemAdded->add(m_tree->prefs(), "");
-                    itemAdded->close();
-                    break;
-                }
-            }
-            itemAdded->close();
-        }
-    }
-    else if(event->mask & IN_DELETE || event->mask & IN_MOVED_FROM)
-    {
-        treeItem->remove_child(event->name);
-    }
+    if(m_monitors.find(path) != m_monitors.end()) return;
 
-    redraw();
+    GFile* gfile = g_file_new_for_path(path.c_str());
+    GFileMonitor* monitor = g_file_monitor_directory(gfile, G_FILE_MONITOR_NONE, nullptr, nullptr);
+    g_object_unref(gfile);
+    m_monitors[path] = monitor;
+    g_signal_connect(monitor, "changed", G_CALLBACK(Filemon::dir_watch_cb), this);
 }
 
 bool Filemon::navigate_to_dir(const std::filesystem::path& path)
@@ -399,21 +504,20 @@ bool Filemon::navigate_to_dir(const std::filesystem::path& path)
         long fileSize;
         try
         {
-            fileSize = entry.is_directory() ? -1 :entry.file_size();
+            fileSize = entry.is_directory() ? -1 : entry.file_size();
         }
         catch(const std::filesystem::filesystem_error& e)
         {
             continue;
         }
-        ListviewFile* item = new ListviewFile(entry.path().filename().string().c_str(), fileSize, entry.path());
+        ListviewFile* item = new ListviewFile(entry.path().filename().c_str(), fileSize, entry.path());
         m_listview->add_item(item);
         m_filesInDir++;
     }
 
-    int watch = inotify_add_watch(m_inotifyFd, path.string().c_str(), IN_CREATE | IN_DELETE | IN_MOVE);
-    m_watchMap[watch] = path;
+    monitor_directory(path);
 
-    label(path.filename().string().c_str());
+    label(path.filename().c_str());
     if(strcmp(label(), "") == 0)
     {
         label("/");
@@ -454,81 +558,217 @@ bool Filemon::navigate_to_dir(const std::filesystem::path& path)
         m_tree->deselect_all();
     }
 
+    chdir(m_currentPath.string().c_str());
 
     return true;
 }
 
 bool Filemon::open_file(const std::filesystem::path &path)
 {
-    struct stat st;
-    if (stat(path.string().c_str(), &st) == 0 && (st.st_mode & S_IXUSR))
+    chdir(path.parent_path().c_str());
+    GFile* gfile = g_file_new_for_path(path.c_str());
+    GFileInfo* gfileinfo = g_file_query_info(gfile, G_FILE_ATTRIBUTE_STANDARD_CONTENT_TYPE, G_FILE_QUERY_INFO_NONE, nullptr, nullptr);
+    std::string mime(g_file_info_get_content_type(gfileinfo));
+    g_object_unref(gfileinfo);
+    g_object_unref(gfile);
+
+    GAppInfo* gappinfo;
+
+    if (mime == "application/x-executable")
     {
-        std::string command = "nohup \"" + path.string() + "\" &";
-        if (popen(command.c_str(), "r") == nullptr)
-        {
-            return false;
-        }
+        std::string command = "\"" + path.string() + "\"";
+        gappinfo = g_app_info_create_from_commandline(command.c_str(), nullptr, G_APP_INFO_CREATE_NONE, nullptr);
+        g_app_info_launch(gappinfo, nullptr, nullptr, nullptr);
     }
     else
     {
-        std::string command = "xdg-open \"" + path.string() + "\"";
-        if (system(command.c_str()) == -1)
+        gappinfo = g_app_info_get_default_for_type(mime.c_str(), true);
+        if(!gappinfo)
         {
             return false;
         }
+
+        std::string uri = "file://" + path.string();
+        GList* uris = nullptr;
+        uris = g_list_append(uris, (gpointer)uri.c_str());
+        g_app_info_launch_uris(gappinfo, uris, nullptr, nullptr);
+        g_list_free(uris);
     }
+
+    g_object_unref(gappinfo);
+
+    chdir(m_currentPath.string().c_str());
     return true;
+}
+
+bool Filemon::open_terminal()
+{
+    GAppInfo* gappinfo;
+
+    GError* error = nullptr;
+    gappinfo = g_app_info_create_from_commandline(m_terminalEmulator.c_str(), nullptr, G_APP_INFO_CREATE_NONE, &error);
+    if(error)
+    {
+        g_error_free(error);
+        return false;
+    }
+
+                                                            
+    if(!gappinfo)
+    {
+        return false;
+    }
+
+    g_app_info_launch(gappinfo, nullptr, nullptr, nullptr);
+    g_object_unref(gappinfo);
+    return true;
+}
+
+void Filemon::copy_selected_files(bool cut)
+{
+    std::string buffer;
+    buffer += cut ? "cut\n" : "copy\n";
+    std::vector<int> selected = m_listview->get_selected();
+    for(int i = 0; i < selected.size(); i++)
+    {
+        ListviewFile* file = (ListviewFile*)m_listview->get_item(selected[i]);
+        buffer += "file://" + file->get_path().string() + "\n";
+    }
+
+    std::string command;
+
+    #ifdef FLTK_USE_WAYLAND
+	if (fl_wl_display())
+	{
+        // Use wl-copy for Wayland clipboard support with proper MIME type
+        command = "printf \"" + buffer + "\" | wl-copy --type x-special/gnome-copied-files";
+        system(command.c_str());
+        return;
+    }
+    #endif
+
+    command += "printf \"" + buffer + "\" | xclip -sel clip -t x-special/gnome-copied-files";
+
+    system(command.c_str());
+}
+
+void Filemon::paste_files()
+{
+    #ifdef FLTK_USE_WAYLAND
+	if (fl_wl_display())
+	{
+        // Use wl-paste for Wayland clipboard support
+        FILE* pipe = popen("wl-paste --type x-special/gnome-copied-files", "r");
+        
+        if (pipe == nullptr)
+        {
+            return;
+        }
+
+        std::stringstream buffer;
+        char readBuffer[PATH_MAX];
+        while (fgets(readBuffer, PATH_MAX, pipe) != nullptr)
+        {
+            buffer << readBuffer;
+        }
+        pclose(pipe);
+
+        std::string line;
+        bool cut = false;
+        std::getline(buffer, line);
+        if(line == "cut")
+        {
+            cut = true;
+        }
+        else if(line != "copy")
+        {
+            return;
+        }
+        
+        while(std::getline(buffer, line))
+        {
+            if(line.substr(0, 7) != "file://") continue;
+            std::filesystem::path path(line.substr(7));
+            std::filesystem::copy(path, m_currentPath / path.filename(), std::filesystem::copy_options::overwrite_existing);
+            if(cut)
+            {
+                std::filesystem::remove(path);
+            }
+        }
+
+        return;
+    }
+    #endif
+
+    // Unfortunately, xclip can sometimes halt, so we need to use timeout
+    // This happens when the clipboard selection is owned by certain applications
+    // among them all FLTK apps.
+    FILE* pipe = popen("timeout 0.01s xclip -sel clip -o -t x-special/gnome-copied-files", "r");
+
+    if (pipe == nullptr)
+        return;
+
+    std::stringstream buffer;
+    char readBuffer[PATH_MAX];
+    while (fgets(readBuffer, PATH_MAX, pipe) != nullptr)
+    {
+        buffer << readBuffer;
+    }
+    pclose(pipe);
+
+    std::string line;
+    bool cut = false;
+    std::getline(buffer, line);
+    if(line == "cut")
+    {
+        cut = true;
+    }
+    else if(line != "copy")
+    {
+        return;
+    }
+    
+    while(std::getline(buffer, line))
+    {
+        if(line.substr(0, 7) != "file://") continue;
+        std::filesystem::path path(line.substr(7));
+        std::filesystem::copy(path, m_currentPath / path.filename(), std::filesystem::copy_options::overwrite_existing);
+        if(cut)
+        {
+            std::filesystem::remove(path);
+        }
+    }
+}
+
+void Filemon::trash_file(const std::filesystem::path &path)
+{
+    GFile* gfile = g_file_new_for_path(path.c_str());
+    GError* error = nullptr;
+    g_file_trash(gfile, nullptr, &error);
+    if(error)
+    {
+        g_error_free(error);
+    }
+    g_object_unref(gfile);
 }
 
 int Filemon::run()
 {
-    m_inotifyFd = inotify_init();
-    int flags = fcntl(m_inotifyFd, F_GETFL, 0);
-    fcntl(m_inotifyFd, F_SETFL, flags | O_NONBLOCK);
-    int l = 0, i = 0;
-    char buffer[1024 * sizeof (inotify_event) + 16];
-    if(m_inotifyFd == -1)
-    {
-        return 1;
-    }
-
     navigate_to_dir(std::filesystem::current_path());
+
+    GMainLoop* loop = g_main_loop_new(nullptr, false);
     
-    while(true)
+    do
     {
-        i = 0;
-        int r = Fl::wait();
-        if(r == 0)
-        {
-            break;
-        }
+        g_main_context_iteration(g_main_loop_get_context(loop), false);
+    } while (Fl::wait() != 0);
 
-        l = read(m_inotifyFd, buffer, 1024 * sizeof (inotify_event) + 16);
-        
-        while(i < l)
-        {
-            inotify_event* event = (inotify_event*)&buffer[i];
-            if(event->len)
-            {
-                tree_update_branch(event);
+    g_main_loop_unref(loop);
 
-                if(m_watchMap[event->wd] == m_currentPath)
-                {
-                    navigate_to_dir(m_currentPath);
-                }
-            }
-            i += sizeof(inotify_event) + event->len;
-        }
-    }
-
-    for(auto const& watch : m_watchMap)
+    for(auto const& entry : m_monitors)
     {
-        inotify_rm_watch(m_inotifyFd, watch.first);
+        g_object_unref(entry.second);
     }
-
-    close(m_inotifyFd);
-
-    xdg_mime_shutdown();
 
     return 0;
 }

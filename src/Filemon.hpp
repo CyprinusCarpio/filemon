@@ -11,13 +11,14 @@
 #include <FL/Fl_Output.H>
 #include <FL/Fl_Menu_Bar.H>
 #include <FL/Fl_Pixmap.H>
-#include <FL/Fl_Box.H>
 
 #include <FLE/Fle_Dock_Host.hpp>
 #include <FLE/Fle_Dock_Group.hpp>
 #include <FLE/Fle_Listview.hpp>
 #include <FLE/Fle_Toolbar.hpp>
 #include <FLE/Fle_Flat_Button.hpp>
+
+#include <glib-2.0/gio/gio.h>
 
 struct inotify_event;
 
@@ -35,29 +36,39 @@ class Filemon : public Fl_Double_Window
     Fle_Dock_Group* m_addressGroup;
     Fle_Dock_Group* m_statusGroup;
 
+    Fl_Double_Window* m_aboutWindow;
+    Fl_Pixmap*        m_filemonLogo;
+
     std::filesystem::path m_currentPath;
     
     int m_filesInDir;
+    std::string m_terminalEmulator;
 
     std::stack<std::filesystem::path> m_history;
 
     Fl_Pixmap* m_folder16;
 
-    int m_inotifyFd;
-    std::map<int, std::filesystem::path> m_watchMap;
+    std::map<std::filesystem::path, GFileMonitor*> m_monitors;
 
     static void listview_cb(Fl_Widget* w, void* data);
     static void tree_cb(Fl_Widget* w, void* data);
     static void menu_cb(Fl_Widget* w, void* data);
     static void tool_cb(Fl_Widget* w, void* data);
 
+    static void dir_watch_cb(GFileMonitor* monitor, GFile* file, GFile* other_file, GFileMonitorEvent event_type, gpointer user_data);
+
     void construct_menu(Fl_Menu_Bar* menu);
     void construct_toolbar(Fle_Toolbar* toolbar);
     void tree_populate_dir(Fl_Tree_Item* directory, std::filesystem::path path);
-    void tree_update_branch(inotify_event* event);
+    void monitor_directory(const std::filesystem::path& path);
 
     bool navigate_to_dir(const std::filesystem::path& path);
     bool open_file(const std::filesystem::path& path);
+    bool open_terminal();
+
+    void copy_selected_files(bool cut);
+    void paste_files();
+    void trash_file(const std::filesystem::path& path);
 public:
     Filemon(int W, int H, const char* l);
 

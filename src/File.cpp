@@ -13,8 +13,9 @@
 #include <grp.h>
 #include <pwd.h>
 #include <iomanip>
+#include <iostream>
 
-#include "xdgmime.h"
+#include <glib-2.0/gio/gio.h>
 
 bool ListviewFile::is_greater(Fle_Listview_Item* other, int property)
 {
@@ -118,14 +119,19 @@ ListviewFile::ListviewFile(std::string name, long size, std::filesystem::path pa
     static Fl_Pixmap* bin32 = new Fl_Pixmap(bin32_xpm);
     static Fl_Pixmap* bin16 = new Fl_Pixmap(bin16_xpm);
 
+    
     stat(m_path.c_str(), &m_stat);
     if(m_size == -1)
     {
         set_icon(folder16, folder32);
         return;
     }
-    
-    std::string mime = xdg_mime_get_mime_type_for_file(m_path.c_str(), &m_stat);
+
+    GFile* gfile = g_file_new_for_path(m_path.c_str());
+    GFileInfo* gfileinfo = g_file_query_info(gfile, G_FILE_ATTRIBUTE_STANDARD_CONTENT_TYPE, G_FILE_QUERY_INFO_NONE, nullptr, nullptr);
+    std::string mime(g_file_info_get_content_type(gfileinfo));
+    g_object_unref(gfileinfo);
+    g_object_unref(gfile);
 
     if (mime == "application/x-executable" || mime == "application/x-sharedlib" || mime == "application/x-pie-executable" || mime == "application/x-shared-object")
     {
@@ -135,4 +141,8 @@ ListviewFile::ListviewFile(std::string name, long size, std::filesystem::path pa
     {
         set_icon(img16, img32);
     }
+}
+
+ListviewFile::~ListviewFile() 
+{
 }
