@@ -1,12 +1,29 @@
 #include "File.hpp"
 #include "Util.hpp"
 
+// batch nr1
 #include "../icons/folder16.xpm"
 #include "../icons/folder32.xpm"
 #include "../icons/img32.xpm"
 #include "../icons/img16.xpm"
 #include "../icons/bin32.xpm"
 #include "../icons/bin16.xpm"
+
+// batch nr2
+#include "../icons/text32.xpm"
+#include "../icons/text16.xpm"
+#include "../icons/compressed32.xpm"
+#include "../icons/compressed16.xpm"
+#include "../icons/code32.xpm"
+#include "../icons/code16.xpm"
+#include "../icons/audio32.xpm"
+#include "../icons/audio16.xpm"
+#include "../icons/link32.xpm"
+#include "../icons/link16.xpm"
+#include "../icons/pdf32.xpm"
+#include "../icons/pdf16.xpm"
+#include "../icons/config32.xpm"
+#include "../icons/config16.xpm"
 
 #include <FL/fl_draw.H>
 
@@ -119,6 +136,21 @@ ListviewFile::ListviewFile(std::string name, long size, std::filesystem::path pa
     static Fl_Pixmap* bin32 = new Fl_Pixmap(bin32_xpm);
     static Fl_Pixmap* bin16 = new Fl_Pixmap(bin16_xpm);
 
+    static Fl_Pixmap* text32 = new Fl_Pixmap(text32_xpm);
+    static Fl_Pixmap* text16 = new Fl_Pixmap(text16_xpm);
+    static Fl_Pixmap* compressed32 = new Fl_Pixmap(compressed32_xpm);
+    static Fl_Pixmap* compressed16 = new Fl_Pixmap(compressed16_xpm);
+    static Fl_Pixmap* code32 = new Fl_Pixmap(code32_xpm);
+    static Fl_Pixmap* code16 = new Fl_Pixmap(code16_xpm);
+    static Fl_Pixmap* audio32 = new Fl_Pixmap(audio32_xpm);
+    static Fl_Pixmap* audio16 = new Fl_Pixmap(audio16_xpm);
+    static Fl_Pixmap* link32 = new Fl_Pixmap(link32_xpm);
+    static Fl_Pixmap* link16 = new Fl_Pixmap(link16_xpm);
+    static Fl_Pixmap* pdf32 = new Fl_Pixmap(pdf32_xpm);
+    static Fl_Pixmap* pdf16 = new Fl_Pixmap(pdf16_xpm);
+    static Fl_Pixmap* config32 = new Fl_Pixmap(config32_xpm);
+    static Fl_Pixmap* config16 = new Fl_Pixmap(config16_xpm);
+
     
     stat(m_path.c_str(), &m_stat);
     if(m_size == -1)
@@ -140,6 +172,26 @@ ListviewFile::ListviewFile(std::string name, long size, std::filesystem::path pa
     else if(mime.substr(0, 5) == "image")
     {
         set_icon(img16, img32);
+    }
+    else if(mime == "application/pdf")
+    {
+        set_icon(pdf16, pdf32);
+    }
+    else if(mime.substr(0, 6) == "audio/")
+    {
+        set_icon(audio16, audio32);
+    }
+    else if(mime.substr(0, 6) == "video/")
+    {
+        set_icon(img16, img32);
+    }
+    else if(mime.substr(0, 5) == "text/")
+    {
+        set_icon(text16, text32);
+    }
+    else if(mime == "application/x-7z-compressed" || mime == "application/vnd.rar" || mime == "application/x-tar" || mime == "application/gzip" || mime == "application/x-bzip2" || mime == "application/zip")
+    {
+        set_icon(compressed16, compressed32);
     }
 }
 

@@ -16,6 +16,8 @@ set(FILEMON_SOURCES
     src/File.cpp
     src/Util.hpp
     src/Util.cpp
+    src/Preferences.hpp
+    src/Preferences.cpp
 )
 
 add_executable(Filemon ${FILEMON_SOURCES})
