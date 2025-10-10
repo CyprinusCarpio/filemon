@@ -127,7 +127,7 @@ void ListviewFile::draw_property(int i, int X, int Y, int W, int H)
     fl_draw(s.c_str(), X, Y, W, H, FL_ALIGN_LEFT);
 }
 
-ListviewFile::ListviewFile(std::string name, long size, std::filesystem::path path): Fle_Listview_Item(name.c_str()), m_size(size), m_path(path) 
+ListviewFile::ListviewFile(const std::filesystem::path& path, long size): Fle_Listview_Item(path.filename().c_str()),  m_path(path), m_size(size)
 {
     static Fl_Pixmap* folder32 = new Fl_Pixmap(folder32_xpm);
     static Fl_Pixmap* folder16 = new Fl_Pixmap(folder16_xpm);

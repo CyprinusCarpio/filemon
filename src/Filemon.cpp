@@ -331,6 +331,20 @@ Filemon::Filemon(int W, int H, const char* l): Fl_Double_Window(W, H, l)
     closeButton->callback(about_wnd_close_callback);
 }
 
+Filemon::~Filemon()
+{
+    delete m_folder16;
+    delete m_device16;
+    delete m_toolbarBack24;
+    delete m_toolbarForward24;
+    delete m_toolbarUp24;
+    delete m_toolbarSearch24;
+    delete m_toolbarFolders24;
+    delete m_toolbarDevices24;
+    delete m_toolbarHome24;
+    delete m_filemonLogo;
+}
+
 void Filemon::listview_cb(Fl_Widget* w, void* data)
 {
     Filemon* filemon = (Filemon*)data;
@@ -735,16 +749,19 @@ void Filemon::dir_watch_cb(GFileMonitor* monitor, GFile* file, GFile* other_file
     Filemon* filemon = (Filemon*)user_data;
 
     GFile* dir = g_file_get_parent(file);
+    const char* path = g_file_get_path(file);
+    const char* dirPath = g_file_get_path(dir);
+    const char* basename = g_file_get_basename(file);
 
     // If the file is in the current directory, update the listview
-    if(strcmp(g_file_get_path(dir), filemon->m_currentPath.c_str()) == 0)
+    if(strcmp(dirPath, filemon->m_currentPath.c_str()) == 0)
     {
         if(event_type == G_FILE_MONITOR_EVENT_DELETED)
         {
             for(int i = 0; i < filemon->m_listview->get_item_count(); i++)
             {
                 ListviewFile* listviewFile = (ListviewFile*)filemon->m_listview->get_item(i);
-                if(listviewFile->get_path() == g_file_get_path(file))
+                if(listviewFile->get_path() == path)
                 {
                     filemon->m_listview->remove_item(i);
                     filemon->m_filesInDir--;
@@ -764,7 +781,7 @@ void Filemon::dir_watch_cb(GFileMonitor* monitor, GFile* file, GFile* other_file
                     g_object_unref(info);
                 }
             }
-            ListviewFile* item = new ListviewFile(g_file_get_basename(file), size, g_file_get_path(file));
+            ListviewFile* item = new ListviewFile(path, size);
             filemon->m_listview->add_item(item);
             filemon->m_filesInDir++;
         }
@@ -773,7 +790,7 @@ void Filemon::dir_watch_cb(GFileMonitor* monitor, GFile* file, GFile* other_file
             for(int i = 0; i < filemon->m_listview->get_item_count(); i++)
             {
                 ListviewFile* listviewFile = (ListviewFile*)filemon->m_listview->get_item(i);
-                if(listviewFile->get_path() == g_file_get_path(file))
+                if(listviewFile->get_path() == path)
                 {
                     int size = -1;
                     if (g_file_query_file_type(file, G_FILE_QUERY_INFO_NONE, nullptr) != G_FILE_TYPE_DIRECTORY) 
@@ -793,18 +810,17 @@ void Filemon::dir_watch_cb(GFileMonitor* monitor, GFile* file, GFile* other_file
     }
 
     // Update the treeview
-    Fl_Tree_Item* treeItem = filemon->m_tree->find_item(g_file_get_path(dir));
+    Fl_Tree_Item* treeItem = filemon->m_tree->find_item(path);
     if(treeItem && event_type == G_FILE_MONITOR_EVENT_DELETED)
     {
-        treeItem->remove_child(g_file_get_basename(file));
+        treeItem->remove_child(basename);
     }
     if(treeItem && g_file_query_file_type(file, G_FILE_QUERY_INFO_NONE, nullptr) == G_FILE_TYPE_DIRECTORY && event_type == G_FILE_MONITOR_EVENT_CREATED)
     {
-        const char* newItemPath = g_file_get_path(file);
-        Fl_Tree_Item* itemAdded = filemon->m_tree->add(treeItem, g_file_get_basename(file));
+        Fl_Tree_Item* itemAdded = filemon->m_tree->add(treeItem, basename);
         
         // Use GIO to check if the new directory has subdirectories
-        GFile* newItemGFile = g_file_new_for_path(newItemPath);
+        GFile* newItemGFile = g_file_new_for_path(path);
         GFileEnumerator* enumerator = g_file_enumerate_children(newItemGFile, 
             G_FILE_ATTRIBUTE_STANDARD_NAME "," G_FILE_ATTRIBUTE_STANDARD_TYPE,
             G_FILE_QUERY_INFO_NONE, nullptr, nullptr);
@@ -829,6 +845,11 @@ void Filemon::dir_watch_cb(GFileMonitor* monitor, GFile* file, GFile* other_file
         
         itemAdded->close();
     }
+
+    g_object_unref(dir);
+    g_free((gpointer)path);
+    g_free((gpointer)dirPath);
+    g_free((gpointer)basename);
 
     filemon->redraw();
 }
@@ -1103,8 +1124,7 @@ bool Filemon::navigate_to_dir(const std::filesystem::path& path)
             if(filter_file(entry.path()))
                 continue;
             
-            std::string filename = entry.path().filename().string();
-            ListviewFile* item = new ListviewFile(filename.c_str(), fileSize, entry.path());
+            ListviewFile* item = new ListviewFile(entry.path(), fileSize);
             m_listview->add_item(item);
             m_filesInDir++;
         }
@@ -1458,7 +1478,15 @@ void Filemon::popup_menu()
     delete[] popup;
 
     if(canBeOpenedWith)
+    {
+        for(GList* l = canBeOpenedWith; l != nullptr; l = l->next) 
+        {
+            GAppInfo* appInfo = (GAppInfo*)l->data;
+            g_object_unref(appInfo);
+        }
+
         g_list_free(canBeOpenedWith);
+    }
 }
 
 void Filemon::new_file()

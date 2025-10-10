@@ -110,6 +110,7 @@ class Filemon : public Fl_Double_Window
     void show_hidden_files(bool show);
 public:
     Filemon(int W, int H, const char* l);
+    ~Filemon();
 
     int run();
 };

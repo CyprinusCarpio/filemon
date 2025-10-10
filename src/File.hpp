@@ -27,14 +27,14 @@ protected:
 
     void draw_property(int i, int X, int Y, int W, int H) override;
 public:
-    ListviewFile(std::string name, long size, std::filesystem::path path);
+    ListviewFile(const std::filesystem::path& path, long size);
     ~ListviewFile();
 
 
-    bool is_folder() { return m_size == -1; }
-    long size() { return m_size; }
+    bool is_folder() const { return m_size == -1; }
+    long size() const { return m_size; }
     void size(long size) { m_size = size; }
-    std::filesystem::path get_path() { return m_path; }
+    std::filesystem::path get_path() const { return m_path; }
 };
 
 #endif
