@@ -4,6 +4,7 @@
 #include <FLE/Fle_Listview_Item.hpp>
 
 #include <filesystem>
+#include <string>
 #include <sys/stat.h>
 
 enum FileProperty
@@ -21,6 +22,7 @@ class ListviewFile: public Fle_Listview_Item
     long m_size;
     std::filesystem::path m_path;
     struct stat m_stat;
+    std::string m_mimetype;
     
 protected:
     bool is_greater(Fle_Listview_Item* other, int property) override;

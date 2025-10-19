@@ -1,6 +1,7 @@
 #include "Filemon.hpp"
 #include "File.hpp"
 #include "Util.hpp"
+#include "Properties.hpp"
 #include "../icons/folder16.xpm"
 #include "../icons/device16.xpm"
 #include "../icons/unmount16.xpm"
@@ -436,6 +437,12 @@ void Filemon::menu_cb(Fl_Widget* w, void* data)
         case MENU_FILE_QUIT:
             exit(0);
             break;
+        case MENU_FILE_FILE_PROPERTIES:
+            filemon->open_file_properties();
+            break;
+        case MENU_FILE_FOLDER_PROPERTIES:
+            open_properties_wnd({filemon->m_currentPath});
+            break;
         case MENU_EDIT_CUT:
             filemon->copy_selected_files(true);
             break;
@@ -617,6 +624,9 @@ void Filemon::popup_cb(Fl_Widget* w, void* data)
         case MENU_FILE_NEW_FILE:
             filemon->new_file();
             break;
+        case MENU_FILE_FILE_PROPERTIES:
+            filemon->open_file_properties();
+            break;
         case MENU_FILE_NEW_FOLDER:
             filemon->new_folder();
             break;
@@ -684,8 +694,6 @@ void Filemon::popup_cb(Fl_Widget* w, void* data)
         }
         case MENU_EDIT_RENAME:
             filemon->rename_selected();
-            break;
-        case MENU_FILE_FILE_PROPERTIES:
             break;
     }
 }
@@ -1486,6 +1494,21 @@ void Filemon::popup_menu()
         }
 
         g_list_free(canBeOpenedWith);
+    }
+}
+
+void Filemon::open_file_properties()
+{
+    std::vector<int> selected = m_listview->get_selected();
+    std::vector<std::filesystem::path> paths;
+    for(int i = 0; i < selected.size(); i++)
+    {
+        ListviewFile* file = (ListviewFile*)m_listview->get_item(selected[i]);
+        paths.push_back(file->get_path());
+    }
+    if(paths.size() > 0)
+    {
+        open_properties_wnd(paths);
     }
 }
 

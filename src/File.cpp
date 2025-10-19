@@ -32,8 +32,6 @@
 #include <iomanip>
 #include <iostream>
 
-#include <glib-2.0/gio/gio.h>
-
 bool ListviewFile::is_greater(Fle_Listview_Item* other, int property)
 {
     ListviewFile* o = (ListviewFile*)other;
@@ -159,37 +157,33 @@ ListviewFile::ListviewFile(const std::filesystem::path& path, long size): Fle_Li
         return;
     }
 
-    GFile* gfile = g_file_new_for_path(m_path.c_str());
-    GFileInfo* gfileinfo = g_file_query_info(gfile, G_FILE_ATTRIBUTE_STANDARD_CONTENT_TYPE, G_FILE_QUERY_INFO_NONE, nullptr, nullptr);
-    std::string mime(g_file_info_get_content_type(gfileinfo));
-    g_object_unref(gfileinfo);
-    g_object_unref(gfile);
+    m_mimetype = get_mime_type(m_path);
 
-    if (mime == "application/x-executable" || mime == "application/x-sharedlib" || mime == "application/x-pie-executable" || mime == "application/x-shared-object")
+    if (m_mimetype == "application/x-executable" || m_mimetype == "application/x-sharedlib" || m_mimetype == "application/x-pie-executable" || m_mimetype == "application/x-shared-object")
     {
         set_icon(bin16, bin32);
     }
-    else if(mime.substr(0, 5) == "image")
+    else if(m_mimetype.substr(0, 5) == "image")
     {
         set_icon(img16, img32);
     }
-    else if(mime == "application/pdf")
+    else if(m_mimetype == "application/pdf")
     {
         set_icon(pdf16, pdf32);
     }
-    else if(mime.substr(0, 6) == "audio/")
+    else if(m_mimetype.substr(0, 6) == "audio/")
     {
         set_icon(audio16, audio32);
     }
-    else if(mime.substr(0, 6) == "video/")
+    else if(m_mimetype.substr(0, 6) == "video/")
     {
         set_icon(img16, img32);
     }
-    else if(mime.substr(0, 5) == "text/")
+    else if(m_mimetype.substr(0, 5) == "text/")
     {
         set_icon(text16, text32);
     }
-    else if(mime == "application/x-7z-compressed" || mime == "application/vnd.rar" || mime == "application/x-tar" || mime == "application/gzip" || mime == "application/x-bzip2" || mime == "application/zip")
+    else if(m_mimetype == "application/x-7z-compressed" || m_mimetype == "application/vnd.rar" || m_mimetype == "application/x-tar" || m_mimetype == "application/gzip" || m_mimetype == "application/x-bzip2" || m_mimetype == "application/zip")
     {
         set_icon(compressed16, compressed32);
     }

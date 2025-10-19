@@ -99,6 +99,7 @@ class Filemon : public Fl_Double_Window
     bool open_terminal();
     bool filter_file(const std::filesystem::path& path);
     void popup_menu();
+    void open_file_properties();
 
     void new_file();
     void new_folder();
