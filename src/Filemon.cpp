@@ -312,23 +312,33 @@ Filemon::Filemon(int W, int H, const char* l): Fl_Double_Window(W, H, l)
 
     tree_populate_dir(m_tree->root(), "/");
 
-    m_aboutWindow = new Fl_Double_Window(256, 350, "About Filemon");
+    m_aboutWindow = new Fl_Double_Window(256, 300, "About Filemon");
     Fl_Box* logo = new Fl_Box(0, 0, 256, 130);
     logo->image(m_filemonLogo);
-    Fl_Text_Display* text = new Fl_Text_Display(0, 140, 256, 170);
+    Fl_Text_Display* text = new Fl_Text_Display(15, 140, 226, 120);
     Fl_Text_Buffer* buffer = new Fl_Text_Buffer();
     buffer->text(
-        "Filemon 0.1.0\n"
+        "          Filemon 0.1.0\n"
         "A lightweight X11/Wayland file browser for Linux based on the FLTK toolkit."
     );
+    static Fl_Text_Display::Style_Table_Entry styles[] = 
+    {
+        {0x6594b600, FL_HELVETICA_BOLD_ITALIC,  FL_NORMAL_SIZE + 4, Fl_Text_Display::ATTR_BGCOLOR, FL_BACKGROUND_COLOR},
+        {labelcolor(), FL_HELVETICA, FL_NORMAL_SIZE - 2, Fl_Text_Display::ATTR_BGCOLOR, FL_BACKGROUND_COLOR}
+    };
+    Fl_Text_Buffer* stylesBuffer = new Fl_Text_Buffer();
+    stylesBuffer->append("AAAAAAAAAAAAAAAAAAAAAAAA"
+        "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB"
+    );
+    text->highlight_data(stylesBuffer, styles, 2, 'a', 0, 0);
     text->buffer(buffer);
     text->wrap_mode(2, 0);
     text->box(FL_FLAT_BOX);
     text->color(FL_BACKGROUND_COLOR);
 
-    Fl_Button* githubButton = new Fl_Button(100, 318, 70, 26, "GitHub");
+    Fl_Button* githubButton = new Fl_Button(100, 268, 70, 26, "GitHub");
     githubButton->callback(about_wnd_github_callback);
-    Fl_Button* closeButton = new Fl_Button(256 - 70 - 10, 318, 70, 26, "Close");
+    Fl_Button* closeButton = new Fl_Button(256 - 70 - 10, 268, 70, 26, "Close");
     closeButton->callback(about_wnd_close_callback);
 }
 
