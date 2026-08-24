@@ -1525,12 +1525,12 @@ void Filemon::open_file_properties()
 void Filemon::new_file()
 {
     int r;
-    std::string filename = fl_input_str(r, 255, "Enter the new file name:", "");
+    std::string filename (fl_input(255, "Enter the new file name:", ""));
     if(filename.empty())
         return;
     fl_message_title("New file");
     std::filesystem::path newFilePath = m_currentPath.string() + "/" + filename;
-    if(r == 0)
+    if(filename.size() == 0)
     {
         fl_message_title("Error");
         if(std::filesystem::exists(newFilePath))
@@ -1555,12 +1555,12 @@ void Filemon::new_file()
 void Filemon::new_folder()
 {
     int r;
-    std::string foldername = fl_input_str(r, 255, "Enter the new folder name:", "");
+    std::string foldername (fl_input(255, "Enter the new folder name:", ""));
     if(foldername.empty())
         return;
     fl_message_title("New folder");
     std::filesystem::path newFolderPath = m_currentPath.string() + "/" + foldername;
-    if(r == 0)
+    if(foldername.size() == 0)
     {
         fl_message_title("Error");
         if(std::filesystem::exists(newFolderPath))
@@ -1585,12 +1585,12 @@ void Filemon::rename_selected()
 {
     int r;
     fl_message_title("Rename");
-    std::string filename = fl_input_str(r, 255, "Enter the new file name:", "");
+    std::string filename (fl_input(255, "Enter the new file name:", ""));
     if(filename.empty())
         return;
 
     std::filesystem::path newFilePath = m_currentPath.string() + "/" + filename;
-    if(r == 0)
+    if(filename.size() == 0)
     {
         fl_message_title("Error");
         if(std::filesystem::exists(newFilePath))
